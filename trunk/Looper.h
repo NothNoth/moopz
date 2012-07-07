@@ -1,0 +1,3 @@
+
+void LooperSetup();
+void LooperUpdate();
