@@ -78,26 +78,16 @@ boolean ReadStatus(byte b)
   switch (bStatus)
   {
     //Channel dependant messages
-    case 0x08: //Note Off
-      stCurrent.bBytesPending = 2; //Note, Velocity
+    case 0x08: //Note Off : Note, Velocity
+    case 0x09: //Note On : Note, Velocity
+    case 0x0A: //AfterTouch : Note, pressure
+    case 0x0B: // Ctrl Change : Controller Number, value
+    case 0x0E: //Pitch : 14 bits val : pitch value (0X2000 centered)
+      stCurrent.bBytesPending = 2;
     break;
-    case 0x09: //Note On
-      stCurrent.bBytesPending = 2; //Note, Velocity
-    break;
-    case 0x0A: //AfterTouch
-      stCurrent.bBytesPending = 2; //Note, pressure
-    break;
-    case 0x0B: // Ctrl Change
-       stCurrent.bBytesPending = 2; //Controller Number, value
-    break;
-    case 0x0C: //Program Patch
-      stCurrent.bBytesPending = 1; //Prog number
-    break;
-    case 0x0D: //Channel Pressure
-      stCurrent.bBytesPending = 1; //Pressure amount
-    break;
-    case 0x0E: //Pitch
-      stCurrent.bBytesPending = 2; //14 bits val : pitch value (0X2000 centered)
+    case 0x0C: //Program Patch : Prog number
+    case 0x0D: //Channel Pressure : Pressure amount
+      stCurrent.bBytesPending = 1; //
     break;
         
     //System Common
@@ -138,21 +128,22 @@ boolean ReadData(byte b)
   boolean silent = false;
   int i;
   
-  if (stCurrent.bBytesPending == 0) //New aData, no status Bytes : "running status" mode
+  if (!stCurrent.bBytesPending) //New aData, no status Bytes : "running status" mode
+  {
     memcpy(&stCurrent, &stRunning, sizeof(tMIDICommand)); //Current MIDI status is previous One (status byte skipped)
-
+    bIgnoredCommand = false;
+  }
   if (!stCurrent.bBytesPending) //Not waiting for anything (RealTime or unsupported..)
     return true;
     
   
   stCurrent.bBytesPending --;
   stCurrent.aData[stCurrent.bBytesRead] = b;
+  stCurrent.bBytesRead ++; 
 
-  if (stCurrent.bBytesPending) //Wait for other data bytes
-  {
-    stCurrent.bBytesRead ++; 
+  if (stCurrent.bBytesPending) //Wait for other data bytes  
     return false; //Bufferize
-  }
+
   
   //### MIDI Command completed !
   if (bIgnoredCommand) // All data bytes already replayed
@@ -169,25 +160,20 @@ boolean ReadData(byte b)
   }
   
 
-  Serial.write(0x9F);
-  Serial.write(0xAA);
-  Serial.write(0xAA);
-  
-  
+
   if (!silent) //Echo bufferized MIDI Command
   {
-    DisplayBlinkGreen();
-    Serial.write(stCurrent.bStatus << 4 | stCurrent.bChannel);
+    Serial.write((stCurrent.bStatus << 4) | stCurrent.bChannel);
     for (i = 0; i < stCurrent.bBytesRead; i++)
       Serial.write(stCurrent.aData[i]);
   }
-  
+
   //Ready for a new msg with same status (Running Status)
-  stRunning.bStatus = stCurrent.bStatus;
-  stRunning.bChannel = stCurrent.bChannel; 
-  stRunning.bBytesRead = 0;
-  stRunning.bBytesPending = stCurrent.bBytesRead + 1;
-  memset(&stCurrent, 0x00, sizeof(tMIDICommand)); //Reset stCurrentrent command
+  stRunning.bStatus       = stCurrent.bStatus;
+  stRunning.bChannel      = stCurrent.bChannel; 
+  stRunning.bBytesRead    = 0;
+  stRunning.bBytesPending = stCurrent.bBytesRead;
+  memset(&stCurrent, 0x00, sizeof(tMIDICommand)); //Reset stCurrent command
   return false;
 }
 
@@ -204,7 +190,9 @@ void MIDIRead()
   {
     passThrough = ReadData(b);
   }
-    
+  
+  return; //FIXME : blocks everything but notes (debug)
+  
   if (passThrough)
     Serial.write(b); //Echo input
 }

@@ -39,19 +39,13 @@ void changeLooperModeCb(int button, tButtonStatus event, int duration); //Auto/M
 void changeLooperStatusCb(int button, tButtonStatus event, int duration); //Start Recording/Manual play loop
 
 byte NoteCb(byte channel, byte note, byte velocity, byte onOff);
+void SetMode(tLooperMode mode);
+void SetStatus(tLooperStatus lstatus);
 
-void ResetLoop()
-{
-  note1Ok = false;
-  sampleSize = 0;
-  noteIdx = 0;
-}
+void ResetLoop();
+void ResetPlay();
 
-void ResetPlay()
-{
-  replayIdx = 0;
-  replayTimer = millis();
-}
+
 
 void LooperSetup()
 {
@@ -59,47 +53,50 @@ void LooperSetup()
   ControlsRegisterButtonCallback(2, eButtonStatus_Released, 0, changeLooperModeCb); //Auto / Manual
   ControlsRegisterButtonCallback(1, eButtonStatus_Released, 0, changeLooperStatusCb); //Record / Play / Idle
 
-  DisplayWriteStr("X", 15, 0);
   
   memset(aNoteEvents, 0x00, MAX_SAMPLE*sizeof(tNoteEvent));
   ResetLoop();
-  looperMode   = eLooperAuto;
-  looperStatus = eLooperIdle;
+  SetMode(eLooperAuto);
+  SetStatus(eLooperIdle);
 }
 
 void LooperUpdate()
 {
   if (looperStatus != eLooperPlaying) //Nothing to do
     return;
-    
+      DisplayBlinkGreen();
+
   //TODO : replay
   
 }
 
 
 //Called when Note (on/off) received
+//Return : Silent ?
 byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 {
   DisplayBlinkRed();
   
+  /*
   DisplayWriteStr("Note            ", 0, 1);
   DisplayWriteStr(onOff?"On ":"Off", 5, 1);
   DisplayWriteInt(note, 9, 1);
   DisplayWriteInt(velocity, 12, 1);
+*/
 
   if (looperStatus == eLooperIdle) //Simply replay received note
-    return true;
+    return false;
 
   if (looperStatus == eLooperPlaying) //Simply replay received note FIXME : stop passthrough when just starting replay ?
-    return true;
+    return false;
     
   //Recording
   if (noteIdx == MAX_SAMPLE) //Pattern too long
   {
-    looperStatus = eLooperIdle;
+    SetStatus(eLooperIdle);
+    DisplayWriteStr("Too Long", 6, 1);
     ResetLoop();
-    DisplayWriteStr("Pattern too long", 0, 1);
-    return true;
+    return false;
   }
     
   //Detect loops
@@ -121,7 +118,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
           looperStatus = eLooperPlaying;
           DisplayWriteStr("AutoLooping !", 0, 1);
           ResetPlay();
-          return false; //Do not play this note
+          return true; //Do not play this note
         }
         else
         {
@@ -143,9 +140,52 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
   aNoteEvents[noteIdx].velocity = velocity;
   noteIdx ++;
  
-  return true;
+  return false;
 }
 
+void SetMode(tLooperMode mode)
+{
+  looperMode = mode;
+  DisplayWriteStr((looperMode==eLooperManual)?"M":"A", 15, 0);
+}
+
+
+void ResetLoop()
+{
+  note1Ok = false;
+  sampleSize = 0;
+  noteIdx = 0;
+}
+
+void ResetPlay()
+{
+  replayIdx = 0;
+  replayTimer = millis();
+}
+
+
+void SetStatus(tLooperStatus lstatus)
+{
+  switch (lstatus)
+  {
+    case eLooperRecording:
+      looperStatus = eLooperRecording;
+      DisplayWriteStr("Recording...    ", 0, 1);
+      ResetLoop();
+    break;
+    case eLooperPlaying:
+      looperStatus = eLooperPlaying;
+      DisplayWriteStr("Looping !       ", 0, 1);
+      ResetPlay();
+    break;
+    case eLooperIdle:
+      looperStatus = eLooperIdle;
+      DisplayWriteStr("Idle.           ", 0, 1);
+    break;
+  }
+}
+
+// ######## CALLBACKS #########
 
 //Called when mode button pressed
 void changeLooperModeCb(int button, tButtonStatus event, int duration) //Change mode
@@ -153,12 +193,10 @@ void changeLooperModeCb(int button, tButtonStatus event, int duration) //Change 
   switch (looperMode)
   {
     case eLooperManual:
-      looperMode = eLooperAuto;
-      DisplayWriteStr("A", 15, 0);
+      SetMode(eLooperAuto);
     break;
     case eLooperAuto:
-      looperMode = eLooperManual;
-      DisplayWriteStr("M", 15, 0);
+      SetMode(eLooperManual);
     break;
   }
 }
@@ -167,27 +205,22 @@ void changeLooperStatusCb(int button, tButtonStatus event, int duration) //Chang
 {
   if (looperStatus == eLooperIdle) //Start recording
   {
-    looperStatus = eLooperRecording;
-    DisplayWriteStr("Recording...", 0, 1);
-    ResetLoop();
+    SetStatus(eLooperRecording);
   }
   else if (looperStatus == eLooperRecording) //Loop (if loop found)
   {
     if (sampleSize) //Manual enable
     {
-      looperStatus = eLooperPlaying;
-      DisplayWriteStr("Looping !", 0, 1);
-      ResetPlay();
+      SetStatus(eLooperPlaying);
     }
     else //No loop
     {
-      DisplayWriteStr("No sample !", 0, 1);
-      looperStatus == eLooperIdle;
+      SetStatus(eLooperIdle);
+      DisplayWriteStr("No sample", 6, 1);
     }
   }
   else if (looperStatus == eLooperPlaying) //Stop playing
   {
-    looperStatus = eLooperIdle;
-    DisplayWriteStr("Idle.", 0, 1);
+    SetStatus(eLooperIdle);
   }
 }
