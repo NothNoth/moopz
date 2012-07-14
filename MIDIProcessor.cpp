@@ -114,9 +114,9 @@ boolean ReadStatus(byte b)
       //DisplayWriteStr("Sys Rtm", 9, 1);
     break;
     default: 
-      DisplayWriteStr("### WTF:      ###", 0, 1);
-      DisplayWriteInt(bChannel, 8, 1);
-      DisplayWriteInt(bStatus, 12, 1);
+      DisplayWriteStr("### WTF:      ###", 0,0);
+      DisplayWriteInt(bChannel, 0, 8);
+      DisplayWriteInt(bStatus, 0, 12);
   }  
 
   return bIgnoredCommand;

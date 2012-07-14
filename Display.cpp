@@ -14,7 +14,7 @@ void DisplaySetup(const char * helloStr)
 {
   //Setup LCD
   lcd.begin(16, 2);
-  lcd.setCursor(0, 0);
+  lcd.home();
   lcd.print(helloStr);
   
   //Setup LEDs
@@ -62,14 +62,16 @@ void DisplayClear()
 
 void DisplayWriteStr(const char * str, byte line, byte col)
 {
-  if ((line != -1) || (col != -1))
-    lcd.setCursor(line, col);
+  lcd.home();
+  //lcd.setCursor(line, col); //Row / col
+  lcd.setCursor(col, line); //Row / col
   lcd.print(str);
 }
 
 void DisplayWriteInt(int  val, byte line, byte col)
 {
-  if ((line != -1) || (col != -1))
-    lcd.setCursor(line, col);
+  lcd.home();
+  //lcd.setCursor(line, col); //Row / col
+  lcd.setCursor(col, line); //Row / col
   lcd.print(val);
 }

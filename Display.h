@@ -6,6 +6,6 @@ void DisplayUpdate();
 void DisplayBlinkRed();
 void DisplayBlinkGreen();
 
-void DisplayWriteStr(const char * str, byte line = -1, byte col = -1);
-void DisplayWriteInt(int val, byte line = -1, byte col = -1);
+void DisplayWriteStr(const char * str, byte line, byte col);
+void DisplayWriteInt(int val,          byte line, byte col);
 void DisplayClear();

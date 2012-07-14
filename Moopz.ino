@@ -37,19 +37,12 @@
     
 */
 
-void knobSample (int knob, int value, tKnobRotate rot)
-{
-  DisplayWriteStr("> Knob [ ]      ", 0, 1);  
-  DisplayWriteInt(knob, 8, 1);  
-  DisplayWriteInt(value, 12, 1);
-}
-
 
 
 void setup()
 {
   DisplaySetup("- Moopz -");
-  DisplayWriteStr("> Starting...", 0, 1);
+  DisplayWriteStr("> Starting...   ", 1, 0);
   delay(2000);
 
   MIDIProcessorSetup();
@@ -62,7 +55,7 @@ void setup()
   
   
   LooperSetup();
-  DisplayWriteStr("   Ready !", 0, 1);
+  DisplayWriteStr("> Ready !       ", 1, 0);
 }
 
 void loop()
