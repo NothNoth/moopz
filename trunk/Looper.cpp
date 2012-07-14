@@ -98,11 +98,6 @@ void LooperUpdate()
     replayTimer = t;
     replayIdx ++;
   }
-  else if (!(t%100))
-  {
-    DisplayWriteStr("Next in         ", 0, 0);
-    DisplayWriteInt(aNoteEvents[replayIdx].time - (t - replayTimer), 0, 8);
-  }
   if (replayIdx == sampleSize) replayIdx = 0;
   
 }
@@ -114,13 +109,6 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 {
   DisplayBlinkRed();
   
-  /*
-  DisplayWriteStr("Note            ", 0, 1);
-  DisplayWriteStr(onOff?"On ":"Off", 5, 1);
-  DisplayWriteInt(note, 9, 1);
-  DisplayWriteInt(velocity, 12, 1);
-*/
-
   if (looperStatus == eLooperIdle) //Simply replay received note
     return false;
 
@@ -158,7 +146,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
       {
         if (looperMode   == eLooperAuto)
         {
-          sampleSize = noteIdx - 2; //Remove previous note (1st note repeated) => A B C D
+          sampleSize = noteIdx - 1; //Remove previous note (1st note repeated) => A B C D
           looperStatus = eLooperPlaying;
           DisplayWriteStr("Looping ! [    ]", 1, 0);
           DisplayWriteInt(sampleSize/2, 1, 12);
