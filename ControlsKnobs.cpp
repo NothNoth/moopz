@@ -106,4 +106,15 @@ int ControlsRegisterKnobCallback(int knob, tKnobCb callback)
   return -1; //Too many cb for this knob (increase KNOB_MAX_CB)
 }
 
-
+void ControlsNotifyKnob(int knob)
+{
+  int j;
+  if ((knob < 0) || (knob >= KNOB_COUNT))
+    return ;
+    
+  while ((j < KNOB_MAX_CB) && (aKnobs[knob].aCallbacks[j] != NULL))
+  {
+    aKnobs[knob].aCallbacks[j](knob, aKnobs[knob].curValue, eKnobOrientationNone);
+    j ++;
+  }
+}

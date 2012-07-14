@@ -14,7 +14,7 @@ A l'enregistrement de cb, on peut préciser press/release et préciser un temps 
 /***********************************
  *     Buttons configuration
  ***********************************/
-#define BUTTON_DELAY  200                    //delay between buttons value check
+#define BUTTON_DELAY  50                     //delay between buttons value check
 #define BUTTON_MAX_CB 4                      //max number of registered cb for buttons
 #define BUTTON_COUNT  3                      //Number of buttons in config
 byte aButtonPins[BUTTON_COUNT] = {2, 3, 4};  //pins used for buttons in config    //TODO : parameter for ButtonsSetup ?
@@ -49,7 +49,8 @@ void ControlsSetupButtons(int time)
   for (i = 0; i < BUTTON_COUNT; i++)
   {
     memset(&aButtons[i], 0x00, sizeof(tButton));
-    aButtons[i].pin = aButtonPins[i];
+    aButtons[i].btStatus   = eButtonStatus_Released;
+    aButtons[i].pin       = aButtonPins[i];
     pinMode((int) aButtons[i].pin, INPUT_PULLUP);
     memset(&aButtons[i].aCallbacks, 0x00, (BUTTON_MAX_CB+1)*sizeof(tButtonCallback));
   }
@@ -73,7 +74,7 @@ void ControlsUpdateButtons(int time)
     if (aButtons[i].btStatus != btVal) //button has changed
     {
       int j;
-    DisplayBlinkGreen();
+      DisplayBlinkGreen();
 
       tButtonStatus st = eButtonStatus_None;
       int timePressed = 0;
