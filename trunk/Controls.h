@@ -28,4 +28,5 @@ void ControlsUpdateButtons(int time);
 int ControlsRegisterButtonCallback(int button, tButtonStatus event, int duration, tButtonCb callback);
 int ControlsRegisterKnobCallback(int knob, tKnobCb callback);
 
+void ControlsNotifyKnob(int knob); //Force callback for knob 
 
