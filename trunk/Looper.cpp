@@ -40,10 +40,14 @@ bool firstNoteReleaseOk;
 
 byte replayIdx;
 int replayTimer;
+
+#define MAX_SLOTS 10
 byte slotIdx;
 
 void changeLooperModeCb(int button, tButtonStatus event, int duration); //Auto/Manual
 void changeLooperStatusCb(int button, tButtonStatus event, int duration); //Start Recording/Manual play loop
+void replayPreviousLoopCb(int button, tButtonStatus event, int duration); //RePlay previous loop on current slot
+
 void dumpLoopCb(int button, tButtonStatus event, int duration); //Dump loop contents
 void slotSelectCb (int knob, int value, tKnobRotate rot);
 
@@ -60,9 +64,11 @@ void ResetPlay();
 void LooperSetup()
 {
   MIDIRegisterNoteCb(NoteCb);
-  ControlsRegisterButtonCallback(2, eButtonStatus_Released, 0, changeLooperModeCb); //Auto / Manual
-  ControlsRegisterButtonCallback(1, eButtonStatus_Released, 0, changeLooperStatusCb); //Record / Play / Idle
+  ControlsRegisterButtonCallback(0, eButtonStatus_Released, 0, changeLooperModeCb); //Auto / Manual
   ControlsRegisterButtonCallback(0, eButtonStatus_Released, 1000, dumpLoopCb); //Debug : Dump notes
+  ControlsRegisterButtonCallback(1, eButtonStatus_Released, 0, changeLooperStatusCb); //Record / Play / Idle
+
+  ControlsRegisterButtonCallback(2, eButtonStatus_Released, 0, replayPreviousLoopCb); //RePlay previous loop on current slot
 
   ControlsRegisterKnobCallback(0, slotSelectCb); //Select slot for loop
   ControlsNotifyKnob(0); //Force update for init
@@ -92,14 +98,12 @@ void LooperUpdate()
     replayTimer = t;
     replayIdx ++;
   }
-  /*
-  else
+  else if (!(t%100))
   {
-    DisplayBlinkGreen();
     DisplayWriteStr("Next in         ", 0, 0);
-    DisplayWriteInt(aNoteEvents[replayIdx].time - (t - replayTimer), 8, 0);
-  }*/
-  if (replayIdx > sampleSize) replayIdx = 0;
+    DisplayWriteInt(aNoteEvents[replayIdx].time - (t - replayTimer), 0, 8);
+  }
+  if (replayIdx == sampleSize) replayIdx = 0;
   
 }
 
@@ -127,7 +131,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
   if (noteIdx == MAX_SAMPLE) //Pattern too long
   {
     SetStatus(eLooperIdle);
-    DisplayWriteStr("Too Long", 6, 1);
+    DisplayWriteStr("Too Long", 1, 6);
     ResetLoop();
     return false;
   }
@@ -156,16 +160,30 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
         {
           sampleSize = noteIdx - 2; //Remove previous note (1st note repeated) => A B C D
           looperStatus = eLooperPlaying;
-          DisplayWriteStr("Looping ! [    ]", 0, 1);
-          DisplayWriteInt(sampleSize/2, 12, 1);
+          DisplayWriteStr("Looping ! [    ]", 1, 0);
+          DisplayWriteInt(sampleSize/2, 1, 12);
           ResetPlay();
+          
+          //Store delta between events     
+          // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
+          int i;
+          for (i = sampleSize - 1; i > 0; i--)
+            aNoteEvents[i].time -= aNoteEvents[i-1].time;
+          aNoteEvents[0].time = 0;
+          
           return true; //Do not play this note
         }
         else
         {
           sampleSize = noteIdx - 2; //FIXME : Not tested...
-          DisplayWriteStr("LoopOk !  [    ]", 0, 1);
+          DisplayWriteStr("LoopOk !  [    ]", 1, 0);
           DisplayWriteInt(sampleSize/2, 12, 1);
+          //Store delta between events     
+          // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
+          int i;
+          for (i = sampleSize - 1; i > 0; i--)
+            aNoteEvents[i].time -= aNoteEvents[i-1].time;
+          aNoteEvents[0].time = 0;
         }
       }
       else
@@ -180,7 +198,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
   aNoteEvents[noteIdx].bStatus = onOff?0x09:0x08;
   aNoteEvents[noteIdx].bChannel = channel;
   aNoteEvents[noteIdx].note = note;
-  aNoteEvents[noteIdx].time = (!noteIdx)?0:(millis()-aNoteEvents[noteIdx-1].time); //Save time since previous note
+  aNoteEvents[noteIdx].time = millis();
   aNoteEvents[noteIdx].velocity = velocity;
   noteIdx ++;
  
@@ -190,7 +208,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 void SetMode(tLooperMode mode)
 {
   looperMode = mode;
-  DisplayWriteStr((looperMode==eLooperManual)?"M":"A", 15, 0);
+  DisplayWriteStr((looperMode==eLooperManual)?"M":"A", 0, 15);
 }
 
 
@@ -215,17 +233,17 @@ void SetStatus(tLooperStatus lstatus)
   {
     case eLooperRecording:
       looperStatus = eLooperRecording;
-      DisplayWriteStr("Recording...    ", 0, 1);
+      DisplayWriteStr("Recording...    ", 1, 0);
       ResetLoop();
     break;
     case eLooperPlaying:
       looperStatus = eLooperPlaying;
-      DisplayWriteStr("Looping !       ", 0, 1);
+      DisplayWriteStr("Looping !       ", 1, 0);
       ResetPlay();
     break;
     case eLooperIdle:
       looperStatus = eLooperIdle;
-      DisplayWriteStr("Idle.           ", 0, 1);
+      DisplayWriteStr("Idle.           ", 1, 0);
     break;
   }
 }
@@ -261,7 +279,7 @@ void changeLooperStatusCb(int button, tButtonStatus event, int duration) //Chang
     else //No loop
     {
       SetStatus(eLooperIdle);
-      DisplayWriteStr("No sample", 6, 1);
+      DisplayWriteStr("No sample", 1, 6);
     }
   }
   else if (looperStatus == eLooperPlaying) //Stop playing
@@ -269,6 +287,18 @@ void changeLooperStatusCb(int button, tButtonStatus event, int duration) //Chang
     SetStatus(eLooperIdle);
   }
 }
+
+ //RePlay previous loop on current slot
+void replayPreviousLoopCb(int button, tButtonStatus event, int duration)
+{
+  if (!sampleSize) //No loop
+  {
+    DisplayWriteStr("No sample", 1, 6);
+    return;
+  }
+  SetStatus(eLooperPlaying);
+}
+
 
 void dumpLoopCb(int button, tButtonStatus event, int duration)
 {
@@ -288,7 +318,7 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
   delay(1000);
 
   
-  if (sampleSize) DisplayWriteStr("[ ]   n       m", 0, 0);
+  if (sampleSize) DisplayWriteStr("[ ]   n       ms", 0, 0);
   for (i = 0; i < sampleSize; i++)
   {
     //[4] R n67 1234ms
@@ -298,16 +328,18 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
     DisplayWriteInt(aNoteEvents[i].time, 0, 10);
     delay(1000);
   }
+  delay(1000);
+  DisplayClear();
 }
 
 void slotSelectCb (int knob, int value, tKnobRotate rot)
 {
-  byte v = value * 10/1024;
+  byte v = MAX_SLOTS - (value * MAX_SLOTS/1024) - 1;
   
   if (v == slotIdx)
     return;
   
   slotIdx = v;
   DisplayWriteStr("[ ]", 0, 0);
-  DisplayWriteInt(slotIdx, 1, 0);
+  DisplayWriteInt(slotIdx, 0, 1);
 }
