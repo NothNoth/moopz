@@ -57,7 +57,7 @@ void SetMode(tLooperMode mode);
 void SetStatus(tLooperStatus lstatus);
 
 void ResetLoop();
-void ResetPlay();
+void ResetPlay(byte playIdx = 0);
 
 
 
@@ -86,10 +86,12 @@ void LooperUpdate()
   int t;
   if (looperStatus != eLooperPlaying) //Nothing to do
     return;
-    
+  
+  
+  // Play recorded loop
   t = millis();
 
-//A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
+  //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
   if ((t - replayTimer) >= aNoteEvents[replayIdx].time)
   {
     Serial.write((aNoteEvents[replayIdx].bStatus << 4) | aNoteEvents[replayIdx].bChannel);
@@ -150,7 +152,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
           looperStatus = eLooperPlaying;
           DisplayWriteStr("Looping ! [    ]", 1, 0);
           DisplayWriteInt(sampleSize/2, 1, 12);
-          ResetPlay();
+          ResetPlay(3);
           
           //Store delta between events     
           // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
@@ -159,7 +161,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
             aNoteEvents[i].time -= aNoteEvents[i-1].time;
           aNoteEvents[0].time = 0;
           
-          return true; //Do not play this note
+          return false;
         }
         else
         {
@@ -208,9 +210,9 @@ void ResetLoop()
   noteIdx = 0;
 }
 
-void ResetPlay()
+void ResetPlay(byte playIdx)
 {
-  replayIdx = 0;
+  replayIdx = playIdx;
   replayTimer = millis();
 }
 
