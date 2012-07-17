@@ -18,14 +18,14 @@ TODO : calibrer les boutons voir établir un max (0-1024 ?)
  *     Knobs configuration
  ***********************************/
 #define KNOB_DELAY 100                 //delay between knobs value check
-#define KNOB_MAX_CB 4                  //max number of registered cb for knobs
+#define KNOB_MAX_CB 2                  //max number of registered cb for knobs
 #define KNOB_COUNT 2                   //Number of knobs in config
 byte aKnobPins[KNOB_COUNT] = {0, 1};   //pins used for knobs in config
 
 
 typedef struct
 {
-  tKnobCb aCallbacks[KNOB_MAX_CB+1];
+  tKnobCb aCallbacks[KNOB_MAX_CB];
   byte pin;
   int curValue;  //actuel knob value
   int prevValue; //previous knob value
@@ -108,7 +108,7 @@ int ControlsRegisterKnobCallback(int knob, tKnobCb callback)
 
 void ControlsNotifyKnob(int knob)
 {
-  int j;
+  int j = 0;
   if ((knob < 0) || (knob >= KNOB_COUNT))
     return ;
     
