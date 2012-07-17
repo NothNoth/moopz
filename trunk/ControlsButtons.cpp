@@ -15,7 +15,7 @@ A l'enregistrement de cb, on peut préciser press/release et préciser un temps 
  *     Buttons configuration
  ***********************************/
 #define BUTTON_DELAY  50                     //delay between buttons value check
-#define BUTTON_MAX_CB 4                      //max number of registered cb for buttons
+#define BUTTON_MAX_CB 2                      //max number of registered cb for buttons
 #define BUTTON_COUNT  3                      //Number of buttons in config
 byte aButtonPins[BUTTON_COUNT] = {2, 3, 4};  //pins used for buttons in config    //TODO : parameter for ButtonsSetup ?
 
@@ -33,7 +33,7 @@ typedef struct
   byte              pin;
   tButtonStatus     btStatus;
   int               timePressed;
-  tButtonCallback   aCallbacks[BUTTON_MAX_CB + 1];
+  tButtonCallback   aCallbacks[BUTTON_MAX_CB];
 } tButton;
 
 
