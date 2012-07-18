@@ -21,7 +21,6 @@ typedef struct //8 byte struct
 {
   int time;
   byte bStatus;
-  byte bChannel;
   byte note;
   byte velocity;
 } tNoteEvent;
@@ -41,7 +40,8 @@ typedef struct
   bool firstNoteReleaseOk;
 
   byte replayIdx;
-  int replayTimer;
+  int  replayTimer;
+  byte bChannel;
 } tLooperSlot;
 
 tLooperMode   looperMode;
@@ -107,7 +107,7 @@ void LooperUpdate()
       //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
       if ((t - aSlots[i].replayTimer) >= aSlots[i].aNoteEvents[aSlots[i].replayIdx].time)
       {
-        Serial.write((aSlots[i].aNoteEvents[aSlots[i].replayIdx].bStatus << 4) | aSlots[i].aNoteEvents[aSlots[i].replayIdx].bChannel);
+        Serial.write((aSlots[i].aNoteEvents[aSlots[i].replayIdx].bStatus << 4) | aSlots[i].bChannel);
         Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].note);
         Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].velocity);
         aSlots[i].replayTimer = t;
@@ -199,8 +199,9 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
     }
   }
 
+  if (aSlots[slotIdx].noteIdx == 0) //Ignore channel change during record ..
+    aSlots[slotIdx].bChannel = channel;
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].bStatus = onOff?0x09:0x08;
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].bChannel = channel;
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].note = note;
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].time = millis();
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].velocity = velocity;
