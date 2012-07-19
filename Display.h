@@ -1,5 +1,5 @@
 #include "Arduino.h"
-void DisplaySetup(const  char * helloStr);
+void DisplaySetup();
 void DisplayUpdate();
 
 

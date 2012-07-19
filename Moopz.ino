@@ -41,7 +41,8 @@
 
 void setup()
 {
-  DisplaySetup("- Moopz -");
+  DisplaySetup();
+  DisplayWriteStr("    - Moopz -   ", 0, 0);
   DisplayWriteStr("> Starting", 1, 0);
   delay(2000);
 
