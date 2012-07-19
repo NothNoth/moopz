@@ -3,6 +3,7 @@
 #include "Display.h"
 
 
+#define _DEBUG
 
 typedef enum
 {
@@ -20,7 +21,6 @@ typedef enum
 typedef struct //8 byte struct
 {
   int time;
-  byte bStatus;
   byte note;
   byte velocity;
 } tNoteEvent;
@@ -107,7 +107,7 @@ void LooperUpdate()
       //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
       if ((t - aSlots[i].replayTimer) >= aSlots[i].aNoteEvents[aSlots[i].replayIdx].time)
       {
-        Serial.write((aSlots[i].aNoteEvents[aSlots[i].replayIdx].bStatus << 4) | aSlots[i].bChannel);
+        Serial.write(((aSlots[i].aNoteEvents[aSlots[i].replayIdx].velocity)?0x90:0x80) | aSlots[i].bChannel);
         Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].note);
         Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].velocity);
         aSlots[i].replayTimer = t;
@@ -139,7 +139,8 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
     ResetLoop(slotIdx);
     return false;
   }
-    
+  
+   
   //Detect loops
   if (aSlots[slotIdx].noteIdx > 3) //Press+Release 1st note, Press 2nd note
   {
@@ -181,7 +182,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
         {
           aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2; //FIXME : Not tested...
           DisplayWriteStr("LoopOk !  [    ]", 1, 0);
-          DisplayWriteInt(aSlots[slotIdx].sampleSize/2, 12, 1);
+          DisplayWriteInt(aSlots[slotIdx].sampleSize/2, 1, 12);
           //Store delta between events     
           // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
           int i;
@@ -201,10 +202,9 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 
   if (aSlots[slotIdx].noteIdx == 0) //Ignore channel change during record ..
     aSlots[slotIdx].bChannel = channel;
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].bStatus = onOff?0x09:0x08;
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].note = note;
   aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].time = millis();
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].velocity = velocity;
+  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].velocity = onOff?velocity:0;
   aSlots[slotIdx].noteIdx ++;
  
   return false;
@@ -315,7 +315,7 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
   DisplayWriteStr("Debug ...      ", 0, 0);
   delay(1000);
   DisplayWriteStr("Mode :         ", 0, 0);
-  DisplayWriteStr(looperMode==eLooperManual?"Manual":"Auto", 0, 7);
+  DisplayWriteStr((looperMode==eLooperManual)?"Manual":"Auto", 0, 7);
   delay(1000);
   DisplayWriteStr("Status :       ", 0, 0);
   DisplayWriteStr(looperStatus==eLooperIdle?"Idle":(looperStatus==eLooperPlaying?"Playing":"Recording"), 0, 9);
@@ -330,7 +330,7 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
   {
     //[4] R n67 1234ms
     DisplayWriteInt(i, 0, 1);
-    DisplayWriteStr(aSlots[slotIdx].aNoteEvents[i].bStatus==0x09?"P":"R", 0, 4);
+    DisplayWriteStr(aSlots[slotIdx].aNoteEvents[i].velocity?"P":"R", 0, 4);
     DisplayWriteInt(aSlots[slotIdx].aNoteEvents[i].note, 0, 7);
     DisplayWriteInt(aSlots[slotIdx].aNoteEvents[i].time, 0, 10);
     delay(1000);

@@ -10,12 +10,11 @@ LiquidCrystal lcd(5, 8, 9, 10, 11, 12); //RS, Enable, d0, d1, d2, d3
 int redTime   = 0;
 int greenTime = 0;
 
-void DisplaySetup(const char * helloStr)
+void DisplaySetup()
 {
   //Setup LCD
   lcd.begin(16, 2);
   lcd.home();
-  lcd.print(helloStr);
   
   //Setup LEDs
   pinMode(GREEN_PIN, OUTPUT);
