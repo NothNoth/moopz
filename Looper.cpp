@@ -178,7 +178,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
       {
         if (looperMode   == eLooperAuto)
         {
-          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 1; //Remove previous note (1st note repeated) => A B C D
+          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2; //Remove previous note (1st note repeated) => A B C D
           aSlots[slotIdx].slotStatus = eLooperPlaying;
           looperStatus = eLooperPlaying;
           RefreshDisplay("Loop !");
@@ -195,6 +195,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
         }
         else  //Manual mode
         {
+          //Store longest loop found for now
           aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2;
           RefreshDisplay("LoopRdy");
         }
@@ -338,7 +339,7 @@ void slotPlayMuteCb(int button, tButtonStatus event, int duration) //Change stat
     aSlots[slotIdx].slotStatus = eLooperPlaying;
     looperStatus = eLooperPlaying;
   }
-  else if (looperStatus == eLooperPlaying) //Loop (if loop found)
+  else if (aSlots[slotIdx].slotStatus == eLooperPlaying) //Loop (if loop found)
   {
     aSlots[slotIdx].slotStatus = eLooperIdle;
   }
