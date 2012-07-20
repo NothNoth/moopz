@@ -42,16 +42,14 @@
 void setup()
 {
   DisplaySetup();
-  DisplayWriteStr("    - Moopz -   ", 0, 0);
+  DisplayWriteStr("   - Moopz' -   ", 0, 0);
   DisplayWriteStr("> Starting", 1, 0);
-  delay(2000);
+  delay(1000);
 
   MIDIProcessorSetup();
-
   ControlsSetup();
-  
   LooperSetup();
-  DisplayWriteStr("> Ready !       ", 1, 0);
+
 }
 
 void loop()
