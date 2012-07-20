@@ -1,5 +1,5 @@
 #labels users,guide
-=Interface=
+=Moopz user's guide=
 
 == LCD Screen ==
 LCD display is separated into 5 parts :
