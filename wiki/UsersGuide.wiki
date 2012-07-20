@@ -78,3 +78,43 @@ Sl1               Play
 Idle             Auto
 Sl1               Play
 }}}
+2 : Press button 1 again, the loop in slot1 is played :
+{{{
+Play             Auto
+Sl1               Play
+}}}
+
+== Example 2 : add a loop in manual mode on slot2 ==
+1 : Process with Example 1
+
+2 : Use knob to select slot 2 :
+{{{
+Play             Auto
+Sl2              Empt
+}}}
+
+3 : Press button 3 to switch to "Manual" mode :
+{{{
+Play              Man
+Sl2              Empt
+}}}
+
+4 : Press button 2 for 1s :
+{{{
+Play              Man
+Sl2                Rec.
+}}}
+
+5 : Play a loop on your keyboard. You can use this manual mode to play more complex melodies (where first two notes of the sample are repeated). If a loop is found, the screen shows ;
+{{{
+Play              Man
+Sl2 LoopRdy  Rec.
+}}}
+
+6 : You can now press button 2 to start playing this loop.
+{{{
+Play              Man
+Sl2                Play
+}}}
+
+7 : You now have two loops playing at the same time. You can switch between slots by using the knob 1, play/mute them separately by using button 2, etc.
