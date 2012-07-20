@@ -3,10 +3,10 @@
 
 == LCD Screen ==
 LCD display is separated into 5 parts :
-
+{{{
 General Status..............LooperMode
 Slot Id.......Message....Slot Status
-
+}}}
 
 "General Status" tells you if the looper is actually playing something. It can be "Play" or "Idle".
 In Play mode, filled slots will be played (except muted and empty slot).
