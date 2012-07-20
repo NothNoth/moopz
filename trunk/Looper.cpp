@@ -49,6 +49,7 @@ typedef struct
 tLooperMode   looperMode;
 tLooperStatus looperStatus;
 tLooperSlot   aSlots[MAX_SLOTS];
+int           displayTimeout;
 
 void changeLooperModeCb(int button, tButtonStatus event, int duration); //Auto/Manual
 void slotPlayMuteCb(int button, tButtonStatus event, int duration); //Start/stop play
@@ -61,13 +62,15 @@ void slotSelectCb (int knob, int value, tKnobRotate rot);
 
 
 byte NoteCb(byte channel, byte note, byte velocity, byte onOff);
-void SetMode(tLooperMode mode);
+void SetGlobalMode(tLooperMode mode);
 void SetStatus(tLooperStatus lstatus);
 
 void ResetLoop(int slot);
 void ResetPlay(byte playIdx = 0);
 
 void RefreshDisplay(const char * msg = NULL);
+
+
 
 void LooperSetup()
 {
@@ -91,8 +94,9 @@ void LooperSetup()
   ControlsNotifyKnob(0); //Force update for init
   
 
-  SetMode(eLooperAuto);
+  SetGlobalMode(eLooperAuto);
   SetStatus(eLooperIdle);
+  displayTimeout = 0;
   RefreshDisplay();
 }
 
@@ -122,6 +126,8 @@ void LooperUpdate()
       if (aSlots[i].replayIdx == aSlots[i].sampleSize) aSlots[i].replayIdx = 0;
     }
   }
+  if (displayTimeout && (t - displayTimeout > 2000))
+    RefreshDisplay();
 }
 
 
@@ -190,13 +196,13 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
         else  //Manual mode
         {
           aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2;
-          RefreshDisplay("LoopOk!");
+          RefreshDisplay("LoopRdy");
         }
       }
       else
       {
         // A B C D A E
-        aSlots[slotIdx].firstNotePressOk = false; //restart from scratch
+        aSlots[slotIdx].firstNotePressOk   = false; //restart from scratch
         aSlots[slotIdx].firstNoteReleaseOk = false; //restart from scratch
       }
     }
@@ -217,6 +223,53 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 }
 
 
+
+// ######## SLOT SPECIFIC FUNCTIONS #########
+//Reset loop contents on current slot
+void ResetLoop(int slot)
+{
+  aSlots[slot].firstNotePressOk   = false;
+  aSlots[slot].firstNoteReleaseOk = false;
+  aSlots[slot].sampleSize         = 0;
+  aSlots[slot].noteIdx            = 0;
+  aSlots[slot].secondNote         = 0;
+  aSlots[slot].bChannel           = 0;
+
+  memset(aSlots[slot].aNoteEvents, 0x00, MAX_SAMPLE*sizeof(tNoteEvent));
+
+}
+//Reset play indexes
+void ResetPlay(byte playIdx)
+{
+  aSlots[slotIdx].replayIdx = playIdx;
+  aSlots[slotIdx].replayTimer = millis();
+}
+
+// ######## GENERAL LOOPER FUNCTIONS #########
+//Change looper status (playing/stop)
+void SetStatus(tLooperStatus lstatus)
+{
+  switch (lstatus)
+  {
+    case eLooperPlaying:
+      looperStatus = eLooperPlaying;
+      RefreshDisplay();
+    break;
+    case eLooperIdle:
+      looperStatus = eLooperIdle;
+      RefreshDisplay();
+    break;
+  }
+}
+
+//Change Auto/Manual
+void SetGlobalMode(tLooperMode mode)
+{
+  looperMode = mode;
+  RefreshDisplay();
+}
+
+//Main Display method
 void RefreshDisplay(const char * msg) //7chars max
 {
   DisplayClear();
@@ -254,71 +307,30 @@ void RefreshDisplay(const char * msg) //7chars max
 
   //Custom message
   if (msg)
+  {
     DisplayWriteStr(msg, 1, 4);
-
-
-
-}
-
-void SetMode(tLooperMode mode)
-{
-  looperMode = mode;
-  RefreshDisplay();
-}
-
-
-void ResetLoop(int slot)
-{
-  aSlots[slot].firstNotePressOk   = false;
-  aSlots[slot].firstNoteReleaseOk = false;
-  aSlots[slot].sampleSize         = 0;
-  aSlots[slot].noteIdx            = 0;
-  aSlots[slot].secondNote         = 0;
-  aSlots[slot].bChannel           = 0;
-
-  memset(aSlots[slot].aNoteEvents, 0x00, MAX_SAMPLE*sizeof(tNoteEvent));
-
-}
-
-void ResetPlay(byte playIdx)
-{
-  aSlots[slotIdx].replayIdx = playIdx;
-  aSlots[slotIdx].replayTimer = millis();
-}
-
-
-void SetStatus(tLooperStatus lstatus)
-{
-  switch (lstatus)
+    displayTimeout = millis();
+  }
+  else
   {
-    case eLooperPlaying:
-      looperStatus = eLooperPlaying;
-      RefreshDisplay();
-      ResetPlay(slotIdx);
-    break;
-    case eLooperIdle:
-      looperStatus = eLooperIdle;
-      RefreshDisplay();
-    break;
+    displayTimeout = 0;
   }
 }
 
-// ######## CALLBACKS #########
 
-//Called when mode button pressed
-void changeLooperModeCb(int button, tButtonStatus event, int duration) //Change mode
+// ######## BUTTON CALLBACKS #########
+//## Button 1 : Change global mode (Play/Stop)
+void generalPlayStopCb(int button, tButtonStatus event, int duration)
 {
-  switch (looperMode)
-  {
-    case eLooperManual:
-      SetMode(eLooperAuto);
-    break;
-    case eLooperAuto:
-      SetMode(eLooperManual);
-    break;
-  }
+  if (looperStatus == eLooperIdle)
+    SetStatus(eLooperPlaying);
+  else
+    SetStatus(eLooperIdle);
 }
 
+
+
+//## Button 2 : Change slot mode (Play/Stop) or acknowledge loop on manual mode
 void slotPlayMuteCb(int button, tButtonStatus event, int duration) //Change status (start recording)
 {
   if ((aSlots[slotIdx].slotStatus == eLooperIdle) && aSlots[slotIdx].sampleSize) //Start playing
@@ -360,6 +372,7 @@ void slotPlayMuteCb(int button, tButtonStatus event, int duration) //Change stat
   RefreshDisplay();
 }
 
+//## Button 2 (long press) : Switch current slot to Recording status
 void slotRecordCb(int button, tButtonStatus event, int duration) //Start Recording
 {
   ResetLoop(slotIdx);
@@ -367,15 +380,33 @@ void slotRecordCb(int button, tButtonStatus event, int duration) //Start Recordi
   RefreshDisplay();
 }
 
-
- //RePlay previous loop on current slot
-void generalPlayStopCb(int button, tButtonStatus event, int duration)
+//## Button 3 : Change looper mode (Auto/manual ack)
+void changeLooperModeCb(int button, tButtonStatus event, int duration) //Change mode
 {
-  if (looperStatus == eLooperIdle)
-    SetStatus(eLooperPlaying);
-  else
-    SetStatus(eLooperIdle);
+  switch (looperMode)
+  {
+    case eLooperManual:
+      SetGlobalMode(eLooperAuto);
+    break;
+    case eLooperAuto:
+      SetGlobalMode(eLooperManual);
+    break;
+  }
 }
+
+// ######## KNOBS CALLBACKS #########
+//## Knob 1 : Select slot
+void slotSelectCb (int knob, int value, tKnobRotate rot)
+{
+  byte v = MAX_SLOTS - (value * MAX_SLOTS/1024) - 1;
+  
+  if (v == slotIdx)
+    return;
+  
+  slotIdx = v;
+  RefreshDisplay();
+}
+
 
 #ifdef _DEBUG
 void dumpLoopCb(int button, tButtonStatus event, int duration)
@@ -411,13 +442,3 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
 }
 #endif
 
-void slotSelectCb (int knob, int value, tKnobRotate rot)
-{
-  byte v = MAX_SLOTS - (value * MAX_SLOTS/1024) - 1;
-  
-  if (v == slotIdx)
-    return;
-  
-  slotIdx = v;
-  RefreshDisplay();
-}
