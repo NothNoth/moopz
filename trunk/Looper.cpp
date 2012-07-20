@@ -189,7 +189,7 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
         }
         else  //Manual mode
         {
-          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 1;
+          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2;
           RefreshDisplay("LoopOk!");
         }
       }
@@ -269,10 +269,13 @@ void SetMode(tLooperMode mode)
 
 void ResetLoop(int slot)
 {
-  aSlots[slot].firstNotePressOk = false;
+  aSlots[slot].firstNotePressOk   = false;
   aSlots[slot].firstNoteReleaseOk = false;
-  aSlots[slot].sampleSize = 0;
-  aSlots[slot].noteIdx = 0;
+  aSlots[slot].sampleSize         = 0;
+  aSlots[slot].noteIdx            = 0;
+  aSlots[slot].secondNote         = 0;
+  aSlots[slot].bChannel           = 0;
+
   memset(aSlots[slot].aNoteEvents, 0x00, MAX_SAMPLE*sizeof(tNoteEvent));
 
 }
