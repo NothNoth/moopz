@@ -49,25 +49,32 @@ Know 1 can be used to switch between slots (1-4). Current slot is displayed at t
 2 : Turn knob 1 to select Slot 1 ("Sl1" at the bottom left of the screen)
 
 The LCD now displays :
+{{{
 Idle             Auto
 Sl1             Empt
-
+}}}
 3 : Press button 2 for 1s. LCD screen shows :
+{{{
 Idle             Auto
 Sl1               Rec.
-
+}}}
 4 : Play a 3 notes sequences two times. At the second note of the second sample, looper will start to play :
+{{{
 Play             Auto
 Sl1               Play
-
+}}}
 5 : Press button 2, the loop is muted :
+{{{
 Play             Auto
 Sl1              Mute
-
+}}}
 6 : Press it again, the loops is played :
+{{{
 Play             Auto
 Sl1               Play
-
+}}}
 7 : Press button 1, the looper remains silent :
+{{{
 Idle             Auto
 Sl1               Play
+}}}
