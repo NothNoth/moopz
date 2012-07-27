@@ -4,6 +4,11 @@
 
 
 #define _DEBUG
+#define CHORD_DELAY 30 //x ms max between notes of a same chord
+
+#define SET_CHORD_FLAG(_n) ((_n).velocity = (_n).velocity | 0x80)
+#define IS_CHORD(_n)       (((_n).velocity&0x80 == 0x00) ?false : true)
+#define IS_NOTE_OFF(_n)    ((((_n).velocity&0x7F == 0x00)?true : false))
 
 typedef enum
 {
@@ -36,9 +41,6 @@ typedef struct
   
   byte noteIdx;
   byte sampleSize;
-  bool firstNotePressOk;
-  bool firstNoteReleaseOk;
-  byte secondNote;
   
   byte replayIdx;
   int  replayTimer;
@@ -61,7 +63,7 @@ void dumpLoopCb(int button, tButtonStatus event, int duration); //Dump loop cont
 void slotSelectCb (int knob, int value, tKnobRotate rot);
 
 
-byte NoteCb(byte channel, byte note, byte velocity, byte onOff);
+byte NoteCb(byte channel, byte note, byte velocity);
 void SetGlobalMode(tLooperMode mode);
 void SetStatus(tLooperStatus lstatus);
 
@@ -103,7 +105,6 @@ void LooperSetup()
 void LooperUpdate()
 {
   int t, i;
-  
   if (looperStatus != eLooperPlaying) //Nothing to do
     return;
     
@@ -112,114 +113,219 @@ void LooperUpdate()
 
   for (i = 0; i < MAX_SLOTS; i++)
   {
-    if (aSlots[i].sampleSize && (aSlots[i].slotStatus == eLooperPlaying))
+    tLooperSlot * slot = &aSlots[i];
+    if (slot->sampleSize && (slot->slotStatus == eLooperPlaying))
     {
       //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
-      if ((t - aSlots[i].replayTimer) >= aSlots[i].aNoteEvents[aSlots[i].replayIdx].time)
+      if ((t - slot->replayTimer) >= slot->aNoteEvents[slot->replayIdx].time)
       {
-        Serial.write(((aSlots[i].aNoteEvents[aSlots[i].replayIdx].velocity)?0x90:0x80) | aSlots[i].bChannel);
-        Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].note);
-        Serial.write(aSlots[i].aNoteEvents[aSlots[i].replayIdx].velocity);
-        aSlots[i].replayTimer = t;
-        aSlots[i].replayIdx ++;
+        Serial.write((IS_NOTE_OFF(slot->aNoteEvents[slot->replayIdx])?0x80:0x90) | slot->bChannel);
+        Serial.write(slot->aNoteEvents[slot->replayIdx].note);
+        Serial.write(slot->aNoteEvents[slot->replayIdx].velocity << 1);
+        slot->replayTimer = t;
+        slot->replayIdx ++;
       }
-      if (aSlots[i].replayIdx == aSlots[i].sampleSize) aSlots[i].replayIdx = 0;
+      if (slot->replayIdx == slot->sampleSize) slot->replayIdx = 0;
     }
   }
   if (displayTimeout && (t - displayTimeout > 2000))
     RefreshDisplay();
 }
 
+//True : Match on a least 2 NoteOn or 2 chords at specified offsets
+//False : No match
+boolean EventsCompare(tLooperSlot * slot, byte idx1, byte idx2)
+{
+  //Quick checks to reject trivial cases
+  if (IS_NOTE_OFF(slot->aNoteEvents[idx1]) || //No check on NoteOff
+      IS_NOTE_OFF(slot->aNoteEvents[idx2]) || //No check on NoteOff
+      (IS_CHORD(slot->aNoteEvents[idx1]) && !IS_CHORD(slot->aNoteEvents[idx2])) || //idx1 is a chord and not idx2
+      (IS_CHORD(slot->aNoteEvents[idx2]) && !IS_CHORD(slot->aNoteEvents[idx1])) ||
+      (slot->aNoteEvents[idx1].note != slot->aNoteEvents[idx2].note)) //First note differs
+    return false;
+  
+  byte nbCommon = 0;
+  //A B CDE DE A B CDE DE
+
+  while (idx2 < slot->noteIdx)
+  { 
+    //jump to next NoteOn event
+    while ((idx1 < idx2) && (IS_NOTE_OFF(slot->aNoteEvents[idx1])))
+      idx1++;
+    if (idx1 == idx2) break;
+    while ((idx2 < slot->noteIdx) && (IS_NOTE_OFF(slot->aNoteEvents[idx2])))
+      idx2++;
+    if (idx2 == slot->noteIdx) break;
+
+    //Same note (on single note or same chord)
+    if ((slot->aNoteEvents[idx1].note == slot->aNoteEvents[idx2].note) && (IS_CHORD(slot->aNoteEvents[idx1]) == IS_CHORD(slot->aNoteEvents[idx2])))
+    { 
+      if (!idx1 || (slot->aNoteEvents[idx1].time != slot->aNoteEvents[idx1-1].time)) //increase just once for chords
+        nbCommon ++;
+    }
+    else
+    {
+      //No match, stop here
+      break;
+    }
+    //Match : try next idx
+    idx1 ++;
+    idx2 ++;
+  }
+
+  //Checks common notes found.
+  if (nbCommon >= 2)
+    return true;
+  else
+    return false;
+}
+
+//Updates "sampleSIze" to the longest loop found on given slot
+//Returns true in that case or false if no loop is detected
+boolean LoopDetect(tLooperSlot * slot)
+{
+  int loopStartIdx;
+  int commonNotes = 0;
+  //A B CDE DE A B CDE DE
+  //Not very optimal, rechecks all from the beginning at every note ..
+  //Anyway, it gives us a simpler algorithm with less memory usage (less states to remember)
+
+  loopStartIdx = slot->noteIdx - 3;
+  while (loopStartIdx > 1) //Shorter sample will be too short (Size 0 or 1)
+  {
+    if (EventsCompare(slot, 0, loopStartIdx)) //Found loop
+    {
+      slot->sampleSize = loopStartIdx;
+      return true;
+    }
+    loopStartIdx --; //Try a shorter loop
+  }
+  return false; //Nothing found
+}
+
+//Adds a note on the current slot
+//Detects and optimize chords
+//returns false on slot full
+bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel)
+{
+  int t = millis();
+  
+  if (slot->noteIdx == MAX_SAMPLE) //Slot full
+    return false;
+   
+  if ((slot->noteIdx == 0) && (velocity == 0))//Ignore "NoteOff" as first sample event (not an error)
+    return true;
+    
+  if (slot->noteIdx == 0) //First note of a loop decides the slot's whole channel (reject channel change during loop record)
+    slot->bChannel = channel;
+ 
+  
+  slot->aNoteEvents[slot->noteIdx].note     = note;
+  slot->aNoteEvents[slot->noteIdx].time     = t;
+  slot->aNoteEvents[slot->noteIdx].velocity = velocity >> 1;
+    
+  
+  if (slot->noteIdx && (t - slot->aNoteEvents[slot->noteIdx - 1].time < CHORD_DELAY))
+  {
+    bool ordered = false;
+    int i;
+    
+    slot->aNoteEvents[slot->noteIdx].time = slot->aNoteEvents[slot->noteIdx - 1].time; //Set time at the same value of the previous note for the same chord
+    SET_CHORD_FLAG(slot->aNoteEvents[slot->noteIdx]);
+    SET_CHORD_FLAG(slot->aNoteEvents[slot->noteIdx - 1]);
+
+    
+    //Reorder notes from a chord (for easier and faster loop detection)
+    //Dummy bubble sort, trying to "optimize" anything here would use more RAM ..
+    while (!ordered)
+    {
+      ordered = true;
+      for (i = 0; i < slot->noteIdx - 1; i++)
+      {
+        if ((slot->aNoteEvents[i].time == slot->aNoteEvents[i+1].time) &&
+            (slot->aNoteEvents[i].note > slot->aNoteEvents[i+1].note))
+        {
+          tNoteEvent evt;
+          memcpy(&evt, &slot->aNoteEvents[i], sizeof(tNoteEvent));
+          memcpy(&slot->aNoteEvents[i], &slot->aNoteEvents[i+1], sizeof(tNoteEvent));
+          memcpy(&slot->aNoteEvents[i+1], &evt, sizeof(tNoteEvent)); 
+          ordered = false;         
+        }
+      }
+    }
+  }
+  
+  slot->noteIdx ++;  
+  return true;
+}
+
 
 //Called when Note (on/off) received
 //Return : Silent ?
-byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
+byte NoteCb(byte channel, byte note, byte velocity)
 {
+  boolean loopFound;
+  tLooperSlot * slot = &aSlots[slotIdx];
+  int t = millis();
   DisplayBlinkRed();
 
-  if (aSlots[slotIdx].slotStatus == eLooperIdle) //Simply replay received note
+  if (slot->slotStatus == eLooperIdle) //Simply replay received note
     return false;
 
-  if (aSlots[slotIdx].slotStatus == eLooperPlaying) //Simply replay received note FIXME : stop passthrough when just starting replay ?
+  if (slot->slotStatus == eLooperPlaying) //Simply replay received note FIXME : stop passthrough when just starting replay ?
     return false;
     
   //Recording
-  if (aSlots[slotIdx].noteIdx == MAX_SAMPLE) //Pattern too long
+  if (slot->noteIdx == MAX_SAMPLE) //Pattern too long
   {
-    aSlots[slotIdx].slotStatus = eLooperIdle;
+    slot->slotStatus = eLooperIdle;
     RefreshDisplay((char*)"TooLong");
     ResetLoop(slotIdx);
     return false;
   }
   
-  if (!onOff && !aSlots[slotIdx].noteIdx) //Loop may not start with a NoteOff event ...
+  if (!velocity && !slot->noteIdx) //Loop may not start with a NoteOff event ...
     return false;
    
- 
-  //Detect loops
   DisplayBlinkGreen();
-  if (aSlots[slotIdx].noteIdx > 3) //Press+Release 1st note, Press 2nd note
+  if (!AddNote(slot, note, velocity, channel))
   {
-    if (!aSlots[slotIdx].firstNotePressOk) //Check note 1 => A B C D + A
-    {
-      if (note == aSlots[slotIdx].aNoteEvents[0].note) //Current note is first note of sample
-        aSlots[slotIdx].firstNotePressOk = true;
-    }
-    else if (aSlots[slotIdx].firstNotePressOk && !aSlots[slotIdx].firstNoteReleaseOk)
-    {
-      if (note == aSlots[slotIdx].aNoteEvents[1].note)
-        aSlots[slotIdx].firstNoteReleaseOk = true;
-      else
-        aSlots[slotIdx].firstNotePressOk = false;
-    }
-    else //First note already matched (+release), second note ?  => A B C D A + B
-    {
-      if (note == aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].secondNote].note) //2nd note also matches --> Loooop !!
-      {
-        if (looperMode   == eLooperAuto)
-        {
-          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2; //Remove previous note (1st note repeated) => A B C D
-          aSlots[slotIdx].slotStatus = eLooperPlaying;
-          looperStatus = eLooperPlaying;
-          RefreshDisplay("Loop !");
-          ResetPlay(3);
-          
-          //Store delta between events     
-          // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
-          int i;
-          for (i = aSlots[slotIdx].sampleSize - 1; i > 0; i--)
-            aSlots[slotIdx].aNoteEvents[i].time -= aSlots[slotIdx].aNoteEvents[i-1].time;
-          aSlots[slotIdx].aNoteEvents[0].time = 0;
-          
-          return false;
-        }
-        else  //Manual mode
-        {
-          //Store longest loop found for now
-          aSlots[slotIdx].sampleSize = aSlots[slotIdx].noteIdx - 2;
-          RefreshDisplay("LoopRdy");
-        }
-      }
-      else
-      {
-        // A B C D A E
-        aSlots[slotIdx].firstNotePressOk   = false; //restart from scratch
-        aSlots[slotIdx].firstNoteReleaseOk = false; //restart from scratch
-      }
-    }
+    //Cannot add another note on slot
+    //-> sample must be too long
+    slot->slotStatus = eLooperIdle;
+    RefreshDisplay((char*)"TooLong");
+    ResetLoop(slotIdx);
+    return false;
+  }
+  
+  if (!velocity) //NoteOff is not used to setup a loop
+    return false;
+  
+  loopFound = LoopDetect(slot);
+ 
+  if (!loopFound)//No loop, continue
+    return false;
+   
+  if (looperMode   == eLooperAuto)
+  {
+    slot->slotStatus = eLooperPlaying;
+    looperStatus = eLooperPlaying;
+    RefreshDisplay("Loop !");
+    ResetPlay(3);
+    //Store delta between events     
+    // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
+    int i;
+    for (i = slot->sampleSize - 1; i > 0; i--)
+      slot->aNoteEvents[i].time -= slot->aNoteEvents[i-1].time;
+    slot->aNoteEvents[0].time = 0;
+    return true;
+  }
+  else //Message and wait for manual ack
+  {
+    RefreshDisplay("LoopRdy");
+    return false;
   }
 
-  if (aSlots[slotIdx].noteIdx == 0) //Ignore channel change during record ..
-    aSlots[slotIdx].bChannel = channel;
-    
-  if ((aSlots[slotIdx].secondNote == 0) && aSlots[slotIdx].noteIdx && onOff) //Note first note and NoteOn
-    aSlots[slotIdx].secondNote = aSlots[slotIdx].noteIdx;
-
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].note = note;
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].time = millis();
-  aSlots[slotIdx].aNoteEvents[aSlots[slotIdx].noteIdx].velocity = onOff?velocity:0;
-  aSlots[slotIdx].noteIdx ++;
- 
   return false;
 }
 
@@ -229,11 +335,8 @@ byte NoteCb(byte channel, byte note, byte velocity, byte onOff)
 //Reset loop contents on current slot
 void ResetLoop(int slot)
 {
-  aSlots[slot].firstNotePressOk   = false;
-  aSlots[slot].firstNoteReleaseOk = false;
   aSlots[slot].sampleSize         = 0;
   aSlots[slot].noteIdx            = 0;
-  aSlots[slot].secondNote         = 0;
   aSlots[slot].bChannel           = 0;
 
   memset(aSlots[slot].aNoteEvents, 0x00, MAX_SAMPLE*sizeof(tNoteEvent));
@@ -433,7 +536,7 @@ void dumpLoopCb(int button, tButtonStatus event, int duration)
   {
     //[4] R n67 1234ms
     DisplayWriteInt(i, 0, 1);
-    DisplayWriteStr(aSlots[slotIdx].aNoteEvents[i].velocity?"P":"R", 0, 4);
+    DisplayWriteStr(IS_NOTE_OFF(aSlots[slotIdx].aNoteEvents[i])?"R":"P", 0, 4);
     DisplayWriteInt(aSlots[slotIdx].aNoteEvents[i].note, 0, 7);
     DisplayWriteInt(aSlots[slotIdx].aNoteEvents[i].time, 0, 10);
     delay(1000);

@@ -1,7 +1,7 @@
 #include "Arduino.h"
 
 
-typedef byte (* tMIDINoteCb) (byte channel, byte note, byte velocity, byte onOff) ;
+typedef byte (* tMIDINoteCb) (byte channel, byte note, byte velocity) ;
 
 
 

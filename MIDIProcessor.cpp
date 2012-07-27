@@ -155,8 +155,7 @@ boolean ReadData(byte b)
       //Note Off or not On + velocity = 0 ==> false, else true
       silent = pfNoteCb( stCurrent.bChannel, 
                               stCurrent.aData[0], 
-                              stCurrent.aData[1], 
-                              ((stCurrent.bStatus == 0x08)||((stCurrent.bStatus == 0x09) && (stCurrent.aData[1] == 0x00)))?false:true);
+                              (stCurrent.bStatus == 0x09)?stCurrent.aData[1]:0);//force velocity = 0 for note Off
   }
   
 
