@@ -4,11 +4,35 @@
 
 
 #define _DEBUG
-#define CHORD_DELAY 30 //x ms max between notes of a same chord
+#define CHORD_DELAY 50 //x ms max between notes of a same chord
 
 #define SET_CHORD_FLAG(_n) ((_n).velocity = (_n).velocity | 0x80)
 #define IS_CHORD(_n)       (((_n).velocity&0x80 == 0x00) ?false : true)
-#define IS_NOTE_OFF(_n)    ((((_n).velocity&0x7F == 0x00)?true : false))
+#define IS_NOTE_OFF(_n)    (((((_n).velocity&0x7F) == 0x00)?true : false))
+
+
+byte CharPlay[8] = {
+  0b00000,
+  0b10000,
+  0b11000,
+  0b11110,
+  0b11110,
+  0b11000,
+  0b10000,
+  0b00000,
+};
+
+byte CharStop[8] = {
+  0b00000,
+  0b10010,
+  0b10010,
+  0b10010,
+  0b10010,
+  0b10010,
+  0b10010,
+  0b00000
+};
+
 
 typedef enum
 {
@@ -78,6 +102,9 @@ void LooperSetup()
 {
   int i;
   MIDIRegisterNoteCb(NoteCb);
+
+  DisplayCreateChar(CharPlay, 0);
+  DisplayCreateChar(CharStop, 1);
 
   memset(aSlots, 0x00, MAX_SLOTS*sizeof(tLooperSlot));
   for (i = 0; i < MAX_SLOTS; i++)
@@ -195,7 +222,7 @@ boolean LoopDetect(tLooperSlot * slot)
   {
     if (EventsCompare(slot, 0, loopStartIdx)) //Found loop
     {
-      slot->sampleSize = loopStartIdx;
+      slot->sampleSize = loopStartIdx + 1;
       return true;
     }
     loopStartIdx --; //Try a shorter loop
@@ -209,7 +236,8 @@ boolean LoopDetect(tLooperSlot * slot)
 bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel)
 {
   int t = millis();
-  
+
+
   if (slot->noteIdx == MAX_SAMPLE) //Slot full
     return false;
    
@@ -217,13 +245,16 @@ bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel)
     return true;
     
   if (slot->noteIdx == 0) //First note of a loop decides the slot's whole channel (reject channel change during loop record)
+  {
     slot->bChannel = channel;
- 
+    RefreshDisplay();
+  }
+  
   
   slot->aNoteEvents[slot->noteIdx].note     = note;
   slot->aNoteEvents[slot->noteIdx].time     = t;
   slot->aNoteEvents[slot->noteIdx].velocity = velocity >> 1;
-    
+
   
   if (slot->noteIdx && (t - slot->aNoteEvents[slot->noteIdx - 1].time < CHORD_DELAY))
   {
@@ -279,7 +310,7 @@ byte NoteCb(byte channel, byte note, byte velocity)
   if (slot->noteIdx == MAX_SAMPLE) //Pattern too long
   {
     slot->slotStatus = eLooperIdle;
-    RefreshDisplay((char*)"TooLong");
+    RefreshDisplay((char*)"Too long !");
     ResetLoop(slotIdx);
     return false;
   }
@@ -293,7 +324,7 @@ byte NoteCb(byte channel, byte note, byte velocity)
     //Cannot add another note on slot
     //-> sample must be too long
     slot->slotStatus = eLooperIdle;
-    RefreshDisplay((char*)"TooLong");
+    RefreshDisplay((char*)"Too long !");
     ResetLoop(slotIdx);
     return false;
   }
@@ -310,7 +341,7 @@ byte NoteCb(byte channel, byte note, byte velocity)
   {
     slot->slotStatus = eLooperPlaying;
     looperStatus = eLooperPlaying;
-    RefreshDisplay("Loop !");
+    RefreshDisplay("Loop Ok !");
     ResetPlay(3);
     //Store delta between events     
     // 17100 17200 17300 17400 (2 notes pressed for 100ms and released for 100ms)    
@@ -318,11 +349,11 @@ byte NoteCb(byte channel, byte note, byte velocity)
     for (i = slot->sampleSize - 1; i > 0; i--)
       slot->aNoteEvents[i].time -= slot->aNoteEvents[i-1].time;
     slot->aNoteEvents[0].time = 0;
-    return true;
+    return false;
   }
   else //Message and wait for manual ack
   {
-    RefreshDisplay("LoopRdy");
+    RefreshDisplay("Loop Ready!");
     return false;
   }
 
@@ -378,21 +409,37 @@ void RefreshDisplay(const char * msg) //7chars max
 {
   DisplayClear();
 
+/*
+   X|Auto|Ch07|Sl 4
+   ............Rec.
+
+*/
+
   //1st line
-  DisplayWriteStr((looperMode==eLooperManual)?" Man":"Auto", 0, 12);
   switch (looperStatus)
   {
     case eLooperIdle:
-      DisplayWriteStr("Idle", 0, 0);
+      DisplayWriteChar(1, 0,0);
     break;
     case eLooperPlaying:
-      DisplayWriteStr("Play", 0, 0);
+      DisplayWriteChar(0, 0,0);
     break;
   }
+  DisplayWriteStr((looperMode==eLooperManual)?"|Man |":"|Auto|", 0, 1);
+
+  if (aSlots[slotIdx].sampleSize)
+  {
+    DisplayWriteStr("Ch00|", 0, 7);
+    DisplayWriteInt(aSlots[slotIdx].bChannel, 0, (aSlots[slotIdx].bChannel>9)?9:10);
+  }
+  else
+  {
+    DisplayWriteStr("ChXX|", 0, 7);
+  }
+  DisplayWriteStr("Sl ", 0, 12);
+  DisplayWriteInt(slotIdx+1, 0, 15);
   
   //2nd line
-  DisplayWriteStr("Sl", 1, 0);
-  DisplayWriteInt(slotIdx+1, 1, 2);
   switch (aSlots[slotIdx].slotStatus)
   {
     case eLooperIdle:
@@ -409,10 +456,11 @@ void RefreshDisplay(const char * msg) //7chars max
     break;
   }
 
+  
   //Custom message
   if (msg)
   {
-    DisplayWriteStr(msg, 1, 4);
+    DisplayWriteStr(msg, 1, 0);
     displayTimeout = millis();
   }
   else
@@ -421,15 +469,33 @@ void RefreshDisplay(const char * msg) //7chars max
   }
 }
 
+void ChannelAllOff(byte channel)
+{
+  //Write 0xB<channel> 0x7B 0x00
+  Serial.write(0xB0 | channel);
+  Serial.write(0x7B);
+  Serial.write((byte)0x00);
+}
+
 
 // ######## BUTTON CALLBACKS #########
 //## Button 1 : Change global mode (Play/Stop)
 void generalPlayStopCb(int button, tButtonStatus event, int duration)
 {
   if (looperStatus == eLooperIdle)
+  {
     SetStatus(eLooperPlaying);
+  }
   else
+  {
+    int i;
+    for (i = 0; i < MAX_SLOTS; i++)
+    {
+      if (aSlots[i].slotStatus == eLooperPlaying)
+        ChannelAllOff(aSlots[i].bChannel);
+    }
     SetStatus(eLooperIdle);
+  }
 }
 
 
@@ -444,6 +510,7 @@ void slotPlayMuteCb(int button, tButtonStatus event, int duration) //Change stat
   }
   else if (aSlots[slotIdx].slotStatus == eLooperPlaying) //Loop (if loop found)
   {
+    ChannelAllOff(aSlots[slotIdx].bChannel);
     aSlots[slotIdx].slotStatus = eLooperIdle;
   }
   else if ((aSlots[slotIdx].slotStatus == eLooperRecording) && (looperMode == eLooperManual)) //Manual ack
