@@ -74,3 +74,16 @@ void DisplayWriteInt(int  val, byte line, byte col)
   lcd.setCursor(col, line); //Row / col
   lcd.print(val);
 }
+
+
+void DisplayCreateChar(byte array[8], byte id)
+{
+  lcd.createChar(id, array);
+}
+
+void DisplayWriteChar(byte id, byte line, byte col)
+{
+  lcd.home();
+  lcd.setCursor(col, line); //Row / col
+  lcd.write(id);
+}
