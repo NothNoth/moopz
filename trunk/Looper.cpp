@@ -4,11 +4,11 @@
 
 
 #define _DEBUG
-#define CHORD_DELAY 50 //x ms max between notes of a same chord
+#define CHORD_DELAY 10 //x ms max between notes of a same chord
 
 #define SET_CHORD_FLAG(_n) ((_n).velocity = (_n).velocity | 0x80)
-#define IS_CHORD(_n)       (((_n).velocity&0x80 == 0x00) ?false : true)
-#define IS_NOTE_OFF(_n)    (((((_n).velocity&0x7F) == 0x00)?true : false))
+#define IS_CHORD(_n)       (((_n).velocity&0x80 == 0x00)   ?false : true)
+#define IS_NOTE_OFF(_n)    (((((_n).velocity&0x7F) == 0x00)?true  : false))
 
 
 byte CharPlay[8] = {
@@ -49,7 +49,7 @@ typedef enum
 
 typedef struct //8 byte struct
 {
-  int time; //FIXME : unsigned long !
+  unsigned int time;
   byte note;
   byte velocity;
 } tNoteEvent;
@@ -130,12 +130,14 @@ void LooperSetup()
   RefreshDisplay();
 }
 
-void LooperUpdate(unsigned long timestamp)
+void LooperUpdate()
 {
   byte i;
+  
   if (looperStatus != eLooperPlaying) //Nothing to do
     return;
-
+  unsigned long timestamp = millis();
+  
   // Play recorded loops
   for (i = 0; i < MAX_SLOTS; i++)
   {
@@ -144,7 +146,7 @@ void LooperUpdate(unsigned long timestamp)
     {
       //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
       //Increase timers ont muted slots to keep sync
-      if ((timestamp - slot->replayTimer) >= slot->aNoteEvents[slot->replayIdx].time)
+      if ((int)(timestamp - slot->replayTimer) >= slot->aNoteEvents[slot->replayIdx].time)
       {
         if (slot->slotStatus == eLooperPlaying)
         {
@@ -158,19 +160,19 @@ void LooperUpdate(unsigned long timestamp)
       if (slot->replayIdx == slot->sampleSize) slot->replayIdx = 0;
     }
   }
-  if (displayTimeout && (timestamp - displayTimeout > 2000))
+  if (displayTimeout && ((int)(timestamp - displayTimeout) > 2000))
     RefreshDisplay();
 }
 
 //True : Match on a least 2 NoteOn or 2 chords at specified offsets
 //False : No match
-boolean EventsCompare(tLooperSlot * slot, byte idx1, byte idx2)
+byte EventsCompare(tLooperSlot * slot, byte idx1, byte idx2)
 {
   //Quick checks to reject trivial cases
-  if (IS_NOTE_OFF(slot->aNoteEvents[idx1]) || //No check on NoteOff
-      IS_NOTE_OFF(slot->aNoteEvents[idx2]) || //No check on NoteOff
-      (IS_CHORD(slot->aNoteEvents[idx1]) && !IS_CHORD(slot->aNoteEvents[idx2])) || //idx1 is a chord and not idx2
-      (IS_CHORD(slot->aNoteEvents[idx2]) && !IS_CHORD(slot->aNoteEvents[idx1])) ||
+  if ((IS_NOTE_OFF(slot->aNoteEvents[idx1])) || //No check on NoteOff
+      ((IS_NOTE_OFF(slot->aNoteEvents[idx2]))) || //No check on NoteOff
+      ((IS_CHORD(slot->aNoteEvents[idx1])) && (!IS_CHORD(slot->aNoteEvents[idx2]))) || //idx1 is a chord and not idx2
+      ((IS_CHORD(slot->aNoteEvents[idx2])) && (!IS_CHORD(slot->aNoteEvents[idx1]))) ||
       (slot->aNoteEvents[idx1].note != slot->aNoteEvents[idx2].note)) //First note differs
     return false;
   
@@ -211,11 +213,10 @@ boolean EventsCompare(tLooperSlot * slot, byte idx1, byte idx2)
 }
 
 //Updates "sampleSIze" to the longest loop found on given slot
-//Returns true in that case or false if no loop is detected
-boolean LoopDetect(tLooperSlot * slot)
+//Returns current position in loop in that case or 0xFF if no loop is detected
+byte LoopDetect(tLooperSlot * slot)
 {
   byte loopStartIdx;
-  byte commonNotes = 0;
   //A B CDE DE A B CDE DE
   //Not very optimal, rechecks all from the beginning at every note ..
   //Anyway, it gives us a simpler algorithm with less memory usage (less states to remember)
@@ -226,11 +227,11 @@ boolean LoopDetect(tLooperSlot * slot)
     if (EventsCompare(slot, 0, loopStartIdx)) //Found loop
     {
       slot->sampleSize = loopStartIdx + 1;
-      return true;
+      return slot->noteIdx - slot->sampleSize;
     }
     loopStartIdx --; //Try a shorter loop
   }
-  return false; //Nothing found
+  return 0xFF; //Nothing found
 }
 
 //Adds a note on the current slot
@@ -252,12 +253,12 @@ bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel, unsigne
   
   
   slot->aNoteEvents[slot->noteIdx].note     = note;
-  slot->aNoteEvents[slot->noteIdx].time     = slot->noteIdx?(timestamp - slot->recordTimer):0;
+  slot->aNoteEvents[slot->noteIdx].time     = slot->noteIdx?(int)(timestamp - slot->recordTimer):0;
   slot->aNoteEvents[slot->noteIdx].velocity = velocity >> 1;
   slot->recordTimer = timestamp;
 
   //This event is very close from the previous one => this is a chord.
-  if (slot->noteIdx && (slot->aNoteEvents[slot->noteIdx].time < CHORD_DELAY))
+  if (slot->noteIdx && (slot->aNoteEvents[slot->noteIdx].time < CHORD_DELAY) && (slot->aNoteEvents[slot->noteIdx-1].note != slot->aNoteEvents[slot->noteIdx].note))
   {
     bool ordered = false;
     byte i;
@@ -297,7 +298,7 @@ bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel, unsigne
 //Return : Silent ?
 byte NoteCb(byte channel, byte note, byte velocity, unsigned long timestamp)
 {
-  boolean loopFound;
+  byte loopFound;
   tLooperSlot * slot = &aSlots[slotIdx];
   DisplayBlinkRed();
 
@@ -335,7 +336,7 @@ byte NoteCb(byte channel, byte note, byte velocity, unsigned long timestamp)
   
   loopFound = LoopDetect(slot);
  
-  if (!loopFound)//No loop, continue
+  if (loopFound == 0xFF)//No loop, continue
     return false;
    
   if (looperMode   == eLooperAuto)
@@ -343,7 +344,7 @@ byte NoteCb(byte channel, byte note, byte velocity, unsigned long timestamp)
     slot->slotStatus = eLooperPlaying;
     looperStatus = eLooperPlaying;
     RefreshDisplay("Loop Ok !");
-    ResetPlay(3);
+    ResetPlay(loopFound);
     return false;
   }
   else //Message and wait for manual ack

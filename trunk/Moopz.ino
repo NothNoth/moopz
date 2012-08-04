@@ -57,7 +57,7 @@ void loop()
   unsigned long t = millis();
   ControlsUpdate(); 
   MIDIProcessorUpdate(t);
-  LooperUpdate(t);
+  LooperUpdate();
 
   DisplayUpdate();
 }
