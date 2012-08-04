@@ -34,7 +34,7 @@ void MIDIProcessorSetup()
 
 void MIDIProcessorUpdate(unsigned long timestamp)
 {
-  if (Serial.available())
+  while (Serial.available())
     MIDIRead(timestamp);
 }
 
