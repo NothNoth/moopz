@@ -17,7 +17,7 @@ boolean bIgnoredCommand;
 
 tMIDINoteCb  pfNoteCb;   //Callback for NoteOn/Off commands
 
-void MIDIRead();
+void MIDIRead(unsigned long timestamp);
 boolean ReadStatus(byte b);
 boolean ReadData(byte b);
 
@@ -32,10 +32,10 @@ void MIDIProcessorSetup()
 }
 
 
-void MIDIProcessorUpdate()
+void MIDIProcessorUpdate(unsigned long timestamp)
 {
   if (Serial.available())
-    MIDIRead();
+    MIDIRead(timestamp);
 }
 
 
@@ -123,7 +123,7 @@ boolean ReadStatus(byte b)
 }
 
 
-boolean ReadData(byte b)
+boolean ReadData(byte b, unsigned long timestamp)
 {
   boolean silent = false;
   int i;
@@ -155,7 +155,8 @@ boolean ReadData(byte b)
       //Note Off or not On + velocity = 0 ==> false, else true
       silent = pfNoteCb( stCurrent.bChannel, 
                          stCurrent.aData[0], 
-                         (stCurrent.bStatus == 0x09)?stCurrent.aData[1]:0x00);//force velocity = 0 for note Off
+                         (stCurrent.bStatus == 0x09)?stCurrent.aData[1]:0x00,
+                         timestamp);//force velocity = 0 for note Off
   }
   
 
@@ -176,7 +177,7 @@ boolean ReadData(byte b)
   return false;
 }
 
-void MIDIRead()
+void MIDIRead(unsigned long timestamp)
 {     
   byte passThrough = true; //Only for Unknown/dropped MIDI bytes
   byte b = Serial.read();
@@ -187,7 +188,7 @@ void MIDIRead()
   }
   else //aData byte
   {
-    passThrough = ReadData(b);
+    passThrough = ReadData(b, timestamp);
   }
   
   return; //FIXME : blocks everything but notes (debug)

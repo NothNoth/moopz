@@ -54,9 +54,10 @@ void setup()
 
 void loop()
 {
+  unsigned long t = millis();
   ControlsUpdate(); 
-  MIDIProcessorUpdate();
-  LooperUpdate();
+  MIDIProcessorUpdate(t);
+  LooperUpdate(t);
 
   DisplayUpdate();
 }

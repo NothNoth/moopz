@@ -43,7 +43,7 @@ int lastButtonChecked = 0;
 
 void ControlsSetupButtons(int time)
 {
-  int i;
+  byte i;
 
   //Init buttons
   for (i = 0; i < BUTTON_COUNT; i++)
@@ -120,7 +120,7 @@ void ControlsUpdateButtons(int time)
 
 
 //Registers callback for Button press/release (returns -1 on error)
-int ControlsRegisterButtonCallback(int button, tButtonStatus event, int duration, tButtonCb callback)
+int ControlsRegisterButtonCallback(byte button, tButtonStatus event, int duration, tButtonCb callback)
 {
   int i;
   if ((button < 0) || (button >= BUTTON_COUNT))

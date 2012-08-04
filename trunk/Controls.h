@@ -1,3 +1,4 @@
+#include "Arduino.h"
 
 typedef enum
 {
@@ -17,16 +18,16 @@ void ControlsSetup();
 void ControlsUpdate();
 
 
-typedef void (* tButtonCb) (int button, tButtonStatus event, int duration) ;
-typedef void (* tKnobCb) (int knob, int value, tKnobRotate rot) ;
+typedef void (* tButtonCb) (byte button, tButtonStatus event, int duration) ;
+typedef void (* tKnobCb) (byte knob, int value, tKnobRotate rot) ;
 
 void ControlsSetupKnobs(int time);
 void ControlsUpdateKnobs(int time);
 void ControlsSetupButtons(int time);
 void ControlsUpdateButtons(int time);
 
-int ControlsRegisterButtonCallback(int button, tButtonStatus event, int duration, tButtonCb callback);
-int ControlsRegisterKnobCallback(int knob, tKnobCb callback);
+int ControlsRegisterButtonCallback(byte button, tButtonStatus event, int duration, tButtonCb callback);
+int ControlsRegisterKnobCallback(byte knob, tKnobCb callback);
 
-void ControlsNotifyKnob(int knob); //Force callback for knob 
+void ControlsNotifyKnob(byte knob); //Force callback for knob 
 
