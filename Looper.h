@@ -1,3 +1,3 @@
 
 void LooperSetup();
-void LooperUpdate();
+void LooperUpdate(unsigned long timestamp);

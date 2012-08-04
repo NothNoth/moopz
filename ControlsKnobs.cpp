@@ -88,7 +88,7 @@ void ControlsUpdateKnobs(int time)
 }
 
 //Registers callback for Knobs value change (returns -1 on error)
-int ControlsRegisterKnobCallback(int knob, tKnobCb callback)
+int ControlsRegisterKnobCallback(byte knob, tKnobCb callback)
 {
   int i;
   if ((knob < 0) || (knob >= KNOB_COUNT))
@@ -106,7 +106,7 @@ int ControlsRegisterKnobCallback(int knob, tKnobCb callback)
   return -1; //Too many cb for this knob (increase KNOB_MAX_CB)
 }
 
-void ControlsNotifyKnob(int knob)
+void ControlsNotifyKnob(byte knob)
 {
   int j = 0;
   if ((knob < 0) || (knob >= KNOB_COUNT))
