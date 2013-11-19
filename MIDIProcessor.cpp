@@ -19,7 +19,7 @@ tMIDINoteCb  pfNoteCb;   //Callback for NoteOn/Off commands
 
 void MIDIRead(unsigned long timestamp);
 boolean ReadStatus(byte b);
-boolean ReadData(byte b);
+boolean ReadData(byte b, unsigned long timestamp);
 
 
 void MIDIProcessorSetup()
