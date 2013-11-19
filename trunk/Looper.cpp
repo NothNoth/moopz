@@ -148,21 +148,28 @@ void LooperUpdate()
       //Increase timers ont muted slots to keep sync
       if ((int)(timestamp - slot->replayTimer) >= slot->aNoteEvents[slot->replayIdx].time)
       {
-        if (slot->slotStatus == eLooperPlaying)
+        do
         {
-          Serial.write((IS_NOTE_OFF(slot->aNoteEvents[slot->replayIdx])?0x80:0x90) | slot->bChannel);
-          Serial.write(slot->aNoteEvents[slot->replayIdx].note);
-          Serial.write(slot->aNoteEvents[slot->replayIdx].velocity << 1);
-        }
-        slot->replayTimer = timestamp;
-        slot->replayIdx ++;
+          if (slot->slotStatus == eLooperPlaying)
+          {
+            Serial.write((IS_NOTE_OFF(slot->aNoteEvents[slot->replayIdx])?0x80:0x90) | slot->bChannel);
+            Serial.write(slot->aNoteEvents[slot->replayIdx].note);
+            Serial.write(slot->aNoteEvents[slot->replayIdx].velocity << 1);
+          }
+          slot->replayTimer = timestamp;
+          slot->replayIdx ++;
+          if (slot->replayIdx == slot->sampleSize) slot->replayIdx = 0;
+        }      
+        while (!slot->aNoteEvents[slot->replayIdx].time); //Play all notes from same chors (time = 0)
       }
-      if (slot->replayIdx == slot->sampleSize) slot->replayIdx = 0;
     }
   }
   if (displayTimeout && ((int)(timestamp - displayTimeout) > 2000))
     RefreshDisplay();
 }
+
+
+
 
 //True : Match on a least 2 NoteOn or 2 chords at specified offsets
 //False : No match
@@ -227,7 +234,7 @@ byte LoopDetect(tLooperSlot * slot)
     if (EventsCompare(slot, 0, loopStartIdx)) //Found loop
     {
       slot->sampleSize = loopStartIdx + 1;
-      return slot->noteIdx - slot->sampleSize;
+      return slot->noteIdx - slot->sampleSize + 1;
     }
     loopStartIdx --; //Try a shorter loop
   }
@@ -258,11 +265,13 @@ bool AddNote(tLooperSlot * slot, byte note, byte velocity, byte channel, unsigne
   slot->recordTimer = timestamp;
 
   //This event is very close from the previous one => this is a chord.
-  if (slot->noteIdx && (slot->aNoteEvents[slot->noteIdx].time < CHORD_DELAY) && (slot->aNoteEvents[slot->noteIdx-1].note != slot->aNoteEvents[slot->noteIdx].note))
+  if ((slot->noteIdx) && 
+      (slot->aNoteEvents[slot->noteIdx].time < CHORD_DELAY) && 
+      (slot->aNoteEvents[slot->noteIdx-1].note != slot->aNoteEvents[slot->noteIdx].note))
   {
     bool ordered = false;
     byte i;
-    
+    DisplayBlinkGreen();
     slot->aNoteEvents[slot->noteIdx].time = 0;
     slot->aNoteEvents[slot->noteIdx].time = slot->aNoteEvents[slot->noteIdx - 1].time; //Set time at the same value of the previous note for the same chord
     SET_CHORD_FLAG(slot->aNoteEvents[slot->noteIdx]);
@@ -320,7 +329,7 @@ byte NoteCb(byte channel, byte note, byte velocity, unsigned long timestamp)
   if (!velocity && !slot->noteIdx) //Loop may not start with a NoteOff event ...
     return false;
    
-  DisplayBlinkGreen();
+  //DisplayBlinkGreen();
   if (!AddNote(slot, note, velocity, channel, timestamp))
   {
     //Cannot add another note on slot
@@ -426,7 +435,7 @@ void RefreshDisplay(const char * msg) //7chars max
   if (aSlots[slotIdx].sampleSize)
   {
     DisplayWriteStr("Ch00|", 0, 7);
-    DisplayWriteInt(aSlots[slotIdx].bChannel, 0, (aSlots[slotIdx].bChannel>9)?9:10);
+    DisplayWriteInt(aSlots[slotIdx].bChannel+1, 0, (aSlots[slotIdx].bChannel>9)?9:10); //Ch01 - Ch16
   }
   else
   {
