@@ -130,16 +130,17 @@ void LooperSetup()
 
 void LooperUpdate()
 {
-  byte i;
+  byte s, i;
   
   if (looperStatus != eLooperPlaying) //Nothing to do
     return;
   unsigned long timestamp = millis();
   
   // Play recorded loops
-  for (i = 0; i < MAX_SLOTS; i++)
+  for (s = 0; s < MAX_SLOTS; s++)
   {
-    tLooperSlot * slot = &aSlots[i];
+    tLooperSlot * slot = &aSlots[s];
+    
     if (slot->sampleSize && ((slot->slotStatus == eLooperPlaying)||(slot->slotStatus == eLooperIdle)))
     {
       //A (0ms)  B (10ms) C (5ms) D (1ms) E (100ms) A (0ms) ...
