@@ -1,0 +1,119 @@
+# Moopz user's guide #
+
+## LCD Screen ##
+LCD display is separated into 5 parts :
+```
+<General Status>        <LooperMode>
+<Slot Id>  <Message>   <Slot Status>
+```
+
+"General Status" tells you if the looper is actually playing something. It can be "Play" or "Idle".
+In Play mode, filled slots will be played (except muted and empty slot).
+You can use button 1 to switch between these status.
+
+"Looper Mode" show the looper mode : Auto or Manual (Man). In Auto mode, detected loops will be automatically played if the first 2 notes of the sample are repeated.
+In manual mode, the looper stores le longest loop found and waits for a manual acknowledge.
+You can use button 3 to switch between these modes.
+
+"Slot Id" show the current slot selected (1-4). You can change slot by using Knob 1.
+
+"Message" is a temporary message for the selected slot. It can tells is a loop is found, an error occurred, etc.
+The message will be shown for 2 seconds.
+
+"Slot Status" tells you is the selected slot is Empty/Played/Recording/Muted.
+You can switch between the slot status by using button 2.
+
+## Buttons ##
+Moopz is using 3 buttons :
+
+- Button 1 : Pressing this button will switch between Play and Idle mode. In play mode, slots in "play status" will be played. Empty, and Muted slots will be ignored.
+In idle mode, the looper remains silents (and the looper is a simple passtrough box).
+
+- Button 2 : Pressing this button changes the status of the current slot. The effect of this button depends on the current status.
+With "Empty" status, this button has no effect.
+With "Muted" status, this button will switch slot to "Play".
+With "Play" status, this button will switch slot to "Muted".
+With "Recording" status, and in "Manual" mode, this button will start playing the last loop found.
+
+- Button 2 (press for 1s) : By remaining pressed for 1s (or more) on this button, current slot will be switched to "Recording" status. The looper will listen to MIDI notes played and will try to detect loops.
+In "Auto" mode, detected loop will be played immediately (slot switches to "Play" status) and in manual mode, it will wait for a manual ack (short press on button 2).
+
+- Button 3 : Switch between Auto and Manual mode. Current mode is display at the top right of the LCD screen.
+
+## Knobs ##
+Know 1 can be used to switch between slots (1-4). Current slot is displayed at the bottom left of the LCD screen (ex :  "Sl3").
+
+## Example 1 : 3 notes loop in auto mode on slot 1 ##
+1 : Press button 3 to select "Auto" (selected by default) mode at the top right of the screen
+2 : Turn knob 1 to select Slot 1 ("Sl1" at the bottom left of the screen)
+
+The LCD now displays :
+```
+Idle             Auto
+Sl1             Empt
+```
+3 : Press button 2 for 1s. LCD screen shows :
+```
+Idle             Auto
+Sl1               Rec.
+```
+4 : Play a 3 notes sequences two times. At the second note of the second sample, looper will start to play :
+```
+Play             Auto
+Sl1               Play
+```
+5 : Press button 2, the loop is muted :
+```
+Play             Auto
+Sl1              Mute
+```
+6 : Press it again, the loops is played :
+```
+Play             Auto
+Sl1               Play
+```
+7 : Press button 1, the looper remains silent :
+```
+Idle             Auto
+Sl1               Play
+```
+2 : Press button 1 again, the loop in slot1 is played :
+```
+Play             Auto
+Sl1               Play
+```
+
+## Example 2 : add a loop in manual mode on slot2 ##
+1 : Process with Example 1
+
+2 : Use knob to select slot 2 :
+```
+Play             Auto
+Sl2              Empt
+```
+
+3 : Press button 3 to switch to "Manual" mode :
+```
+Play              Man
+Sl2              Empt
+```
+
+4 : Press button 2 for 1s :
+```
+Play              Man
+Sl2                Rec.
+```
+
+5 : Play a loop on your keyboard. You can use this manual mode to play more complex melodies (where first two notes of the sample are repeated). If a loop is found, the screen shows ;
+```
+Play              Man
+Sl2 LoopRdy  Rec.
+```
+
+6 : You can now press button 2 to start playing this loop.
+```
+Play              Man
+Sl2                Play
+```
+
+7 : You now have two loops playing at the same time. You can switch between slots by using the knob 1, play/mute them separately by using button 2, etc.
